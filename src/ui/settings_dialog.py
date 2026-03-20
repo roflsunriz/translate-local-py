@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
+    QSlider,
     QSpinBox,
     QTabWidget,
     QVBoxLayout,
@@ -83,6 +84,19 @@ class SettingsDialog(QDialog):
         self._timeout_spin.setSuffix(" 秒")
         form.addRow("タイムアウト:", self._timeout_spin)
 
+        opacity_row = QHBoxLayout()
+        self._opacity_slider = QSlider(Qt.Orientation.Horizontal)
+        self._opacity_slider.setRange(20, 100)
+        self._opacity_slider.setValue(100)
+        self._opacity_label = QLabel("100%")
+        self._opacity_label.setFixedWidth(36)
+        self._opacity_slider.valueChanged.connect(
+            lambda v: self._opacity_label.setText(f"{v}%"),
+        )
+        opacity_row.addWidget(self._opacity_slider)
+        opacity_row.addWidget(self._opacity_label)
+        form.addRow("透明度:", opacity_row)
+
         return page
 
     # --- プロンプトタブ ---
@@ -130,6 +144,8 @@ class SettingsDialog(QDialog):
         self._temperature_spin.setValue(self._config.temperature)
         self._max_tokens_spin.setValue(self._config.max_tokens)
         self._timeout_spin.setValue(self._config.timeout)
+        opacity_pct = max(20, min(100, int(self._config.opacity * 100)))
+        self._opacity_slider.setValue(opacity_pct)
         self._system_prompt_edit.setPlainText(self._config.system_prompt)
         self._user_msg_edit.setPlainText(self._config.user_message_template)
 
@@ -141,6 +157,7 @@ class SettingsDialog(QDialog):
             temperature=self._temperature_spin.value(),
             max_tokens=self._max_tokens_spin.value(),
             timeout=self._timeout_spin.value(),
+            opacity=self._opacity_slider.value() / 100.0,
             system_prompt=self._system_prompt_edit.toPlainText(),
             user_message_template=self._user_msg_edit.toPlainText(),
         )

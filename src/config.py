@@ -67,6 +67,7 @@ class AppConfig:
     user_message_template: str = field(
         default_factory=lambda: DEFAULT_USER_MESSAGE_TEMPLATE,
     )
+    opacity: float = 1.0
     always_on_top: bool = False
     window_geometry: str = ""
 

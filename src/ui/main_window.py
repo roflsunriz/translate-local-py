@@ -11,9 +11,11 @@ from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
     QHBoxLayout,
+    QLabel,
     QMainWindow,
     QPlainTextEdit,
     QPushButton,
+    QSlider,
     QSplitter,
     QStatusBar,
     QToolBar,
@@ -62,6 +64,20 @@ class MainWindow(QMainWindow):
         self._settings_action = QAction("⚙ 設定", self)
         self._settings_action.setToolTip("設定ダイアログを開く")
         toolbar.addAction(self._settings_action)
+
+        toolbar.addSeparator()
+
+        opacity_label = QLabel(" 透明度:")
+        toolbar.addWidget(opacity_label)
+        self._opacity_slider = QSlider(Qt.Orientation.Horizontal)
+        self._opacity_slider.setRange(20, 100)
+        self._opacity_slider.setValue(100)
+        self._opacity_slider.setFixedWidth(100)
+        self._opacity_slider.setToolTip("ウィンドウの透明度 (20%–100%)")
+        toolbar.addWidget(self._opacity_slider)
+        self._opacity_value_label = QLabel("100%")
+        self._opacity_value_label.setFixedWidth(36)
+        toolbar.addWidget(self._opacity_value_label)
 
         # --- 中央ウィジェット ---
         central = QWidget()
@@ -166,6 +182,7 @@ class MainWindow(QMainWindow):
     def _connect_signals(self) -> None:
         self._pin_action.toggled.connect(self._on_pin_toggled)
         self._settings_action.triggered.connect(self._on_settings)
+        self._opacity_slider.valueChanged.connect(self._on_opacity_changed)
         self._swap_btn.clicked.connect(self._on_swap_languages)
         self._translate_btn.clicked.connect(self._on_translate)
         self._copy_btn.clicked.connect(self._on_copy)
@@ -183,6 +200,10 @@ class MainWindow(QMainWindow):
 
         self._pin_action.setChecked(self._config.always_on_top)
 
+        opacity_pct = max(20, min(100, int(self._config.opacity * 100)))
+        self._opacity_slider.setValue(opacity_pct)
+        self.setWindowOpacity(self._config.opacity)
+
         if self._config.window_geometry:
             try:
                 geo = QByteArray.fromBase64(self._config.window_geometry.encode("ascii"))
@@ -194,6 +215,7 @@ class MainWindow(QMainWindow):
         self._config.source_lang = self._current_lang_code(self._source_combo)
         self._config.target_lang = self._current_lang_code(self._target_combo)
         self._config.always_on_top = self._pin_action.isChecked()
+        self._config.opacity = self._opacity_slider.value() / 100.0
         self._config.window_geometry = self.saveGeometry().toBase64().data().decode("ascii")
         self._config.save()
 
@@ -209,10 +231,17 @@ class MainWindow(QMainWindow):
             self.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
         self.show()
 
+    def _on_opacity_changed(self, value: int) -> None:
+        self._opacity_value_label.setText(f"{value}%")
+        self.setWindowOpacity(value / 100.0)
+
     def _on_settings(self) -> None:
         dlg = SettingsDialog(self._config, self)
         if dlg.exec():
             self._config = dlg.get_config()
+            opacity_pct = max(20, min(100, int(self._config.opacity * 100)))
+            self._opacity_slider.setValue(opacity_pct)
+            self.setWindowOpacity(self._config.opacity)
             self._save_config()
 
     def _on_swap_languages(self) -> None:
