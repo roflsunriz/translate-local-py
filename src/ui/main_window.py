@@ -6,7 +6,7 @@ import logging
 from typing import cast
 
 from PyQt6.QtCore import QByteArray, QTimer, Qt
-from PyQt6.QtGui import QAction, QKeySequence, QShortcut
+from PyQt6.QtGui import QAction, QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -135,7 +135,9 @@ class MainWindow(QMainWindow):
         for display_name, code in PRESET_LANGUAGES:
             combo.addItem(f"{display_name} ({code})", code)
         combo.setCurrentIndex(-1)
-        combo.lineEdit().setPlaceholderText("言語コード")
+        line_edit = combo.lineEdit()
+        if line_edit is not None:
+            line_edit.setPlaceholderText("言語コード")
         return combo
 
     def _current_lang_code(self, combo: QComboBox) -> str:
@@ -192,7 +194,7 @@ class MainWindow(QMainWindow):
         self._config.source_lang = self._current_lang_code(self._source_combo)
         self._config.target_lang = self._current_lang_code(self._target_combo)
         self._config.always_on_top = self._pin_action.isChecked()
-        self._config.window_geometry = bytes(self.saveGeometry().toBase64()).decode("ascii")
+        self._config.window_geometry = self.saveGeometry().toBase64().data().decode("ascii")
         self._config.save()
 
     # ------------------------------------------------------------------
@@ -271,6 +273,6 @@ class MainWindow(QMainWindow):
     # ウィンドウイベント
     # ------------------------------------------------------------------
 
-    def closeEvent(self, event: "QCloseEvent | None") -> None:  # type: ignore[override]
+    def closeEvent(self, event: QCloseEvent | None) -> None:  # type: ignore[override]
         self._save_config()
         super().closeEvent(event)
