@@ -6,7 +6,7 @@ import logging
 from typing import cast
 
 from PyQt6.QtCore import QByteArray, QTimer, Qt
-from PyQt6.QtGui import QAction, QCloseEvent, QKeySequence, QShortcut
+from PyQt6.QtGui import QAction, QCloseEvent, QKeySequence, QResizeEvent, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -15,8 +15,8 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QSlider,
-    QSplitter,
     QStatusBar,
     QToolBar,
     QVBoxLayout,
@@ -30,6 +30,87 @@ from src.ui.settings_dialog import SettingsDialog
 logger = logging.getLogger(__name__)
 
 
+class AutoResizePlainTextEdit(QPlainTextEdit):
+    """内容に応じて高さが自動調整されるテキストエリア.
+
+    デフォルトは1行分の高さで、テキストが増えると _MAX_LINES まで伸びる。
+    それ以上はスクロールで対応する。
+    """
+
+    _MIN_LINES = 1
+    _MAX_LINES = 12
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._current_height = 0
+        self._adjusting = False
+
+        self.setSizePolicy(
+            self.sizePolicy().horizontalPolicy(),
+            QSizePolicy.Policy.Fixed,
+        )
+        self.textChanged.connect(self._schedule_adjust)
+
+        line_h = self.fontMetrics().lineSpacing()
+        doc = self.document()
+        doc_margin = int(doc.documentMargin()) if doc is not None else 0
+        frame = self.frameWidth() * 2
+        initial = line_h * self._MIN_LINES + doc_margin * 2 + frame
+        self._current_height = initial
+        self.setFixedHeight(initial)
+
+    def resizeEvent(self, event: QResizeEvent | None) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        if not self._adjusting:
+            self._schedule_adjust()
+
+    def _schedule_adjust(self) -> None:
+        QTimer.singleShot(0, self._adjust_height)
+
+    def _count_visual_lines(self) -> int:
+        doc = self.document()
+        if doc is None:
+            return 1
+        total = 0
+        block = doc.begin()
+        while block.isValid():
+            block_layout = block.layout()
+            if block_layout is not None and block_layout.lineCount() > 0:
+                total += block_layout.lineCount()
+            else:
+                total += 1
+            block = block.next()
+        return max(1, total)
+
+    def _adjust_height(self) -> None:
+        if self._adjusting:
+            return
+        self._adjusting = True
+        try:
+            visual_lines = self._count_visual_lines()
+            clamped = max(self._MIN_LINES, min(self._MAX_LINES, visual_lines))
+
+            line_h = self.fontMetrics().lineSpacing()
+            doc = self.document()
+            doc_margin = int(doc.documentMargin()) if doc is not None else 0
+            frame = self.frameWidth() * 2
+
+            new_height = line_h * clamped + doc_margin * 2 + frame
+            if new_height == self._current_height:
+                return
+
+            old_height = self._current_height
+            self._current_height = new_height
+            self.setFixedHeight(new_height)
+
+            window = self.window()
+            if window is not None and window.isVisible() and old_height > 0:
+                delta = new_height - old_height
+                window.resize(window.width(), window.height() + delta)
+        finally:
+            self._adjusting = False
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -39,6 +120,7 @@ class MainWindow(QMainWindow):
         self._init_ui()
         self._connect_signals()
         self._apply_config()
+        self.adjustSize()
 
     # ------------------------------------------------------------------
     # UI 構築
@@ -46,8 +128,7 @@ class MainWindow(QMainWindow):
 
     def _init_ui(self) -> None:
         self.setWindowTitle("LLM Translator")
-        self.setMinimumSize(480, 400)
-        self.resize(560, 520)
+        self.setMinimumWidth(480)
 
         # --- ツールバー ---
         toolbar = QToolBar("メイン")
@@ -99,20 +180,16 @@ class MainWindow(QMainWindow):
         lang_bar.addWidget(self._target_combo, 1)
         layout.addLayout(lang_bar)
 
-        # テキストエリア (スプリッター)
-        splitter = QSplitter(Qt.Orientation.Vertical)
-
-        self._source_edit = QPlainTextEdit()
+        # テキストエリア (内容に応じて自動リサイズ)
+        self._source_edit = AutoResizePlainTextEdit()
         self._source_edit.setPlaceholderText("翻訳したいテキストを入力…")
-        splitter.addWidget(self._source_edit)
+        layout.addWidget(self._source_edit)
 
-        self._target_edit = QPlainTextEdit()
+        self._target_edit = AutoResizePlainTextEdit()
         self._target_edit.setPlaceholderText("翻訳結果がここに表示されます")
-        splitter.addWidget(self._target_edit)
+        layout.addWidget(self._target_edit)
 
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 1)
-        layout.addWidget(splitter, 1)
+        layout.addStretch(1)
 
         # ボタンバー
         btn_bar = QHBoxLayout()
