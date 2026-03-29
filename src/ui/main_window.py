@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 from src.config import ApiProvider, AppConfig, ICONS_DIR, PRESET_LANGUAGES, RESOURCES_DIR
 from src.translator import TranslationManager
 from src.ui.settings_dialog import SettingsDialog
+from src.ui.toggle_switch import ToggleSwitch
 
 
 logger = logging.getLogger(__name__)
@@ -155,6 +156,16 @@ class MainWindow(QMainWindow):
 
         toolbar.addSeparator()
 
+        self._toolbar_label_openai = QLabel(" OpenAI ")
+        toolbar.addWidget(self._toolbar_label_openai)
+        self._toolbar_provider_toggle = ToggleSwitch()
+        self._toolbar_provider_toggle.setToolTip("翻訳エンジンを切り替え")
+        toolbar.addWidget(self._toolbar_provider_toggle)
+        self._toolbar_label_google = QLabel(" Google ")
+        toolbar.addWidget(self._toolbar_label_google)
+
+        toolbar.addSeparator()
+
         opacity_label = QLabel(" 透明度:")
         toolbar.addWidget(opacity_label)
         self._opacity_slider = QSlider(Qt.Orientation.Horizontal)
@@ -239,6 +250,21 @@ class MainWindow(QMainWindow):
         else:
             self._provider_label.setText("OpenAI互換API")
 
+    def _sync_toolbar_toggle(self) -> None:
+        is_google = self._config.provider == ApiProvider.GOOGLE
+        self._toolbar_provider_toggle.blockSignals(True)
+        self._toolbar_provider_toggle.setChecked(is_google)
+        self._toolbar_provider_toggle.blockSignals(False)
+        self._apply_toolbar_provider_style(is_google)
+
+    def _apply_toolbar_provider_style(self, is_google: bool) -> None:
+        if is_google:
+            self._toolbar_label_openai.setStyleSheet("color: #888;")
+            self._toolbar_label_google.setStyleSheet("font-weight: bold;")
+        else:
+            self._toolbar_label_openai.setStyleSheet("font-weight: bold;")
+            self._toolbar_label_google.setStyleSheet("color: #888;")
+
     @staticmethod
     def _make_lang_combo() -> QComboBox:
         combo = QComboBox()
@@ -277,6 +303,7 @@ class MainWindow(QMainWindow):
     def _connect_signals(self) -> None:
         self._pin_action.toggled.connect(self._on_pin_toggled)
         self._settings_action.triggered.connect(self._on_settings)
+        self._toolbar_provider_toggle.toggled.connect(self._on_toolbar_provider_changed)
         self._opacity_slider.valueChanged.connect(self._on_opacity_changed)
         self._swap_btn.clicked.connect(self._on_swap_languages)
         self._translate_btn.clicked.connect(self._on_translate)
@@ -294,6 +321,8 @@ class MainWindow(QMainWindow):
         self._set_lang_combo(self._target_combo, self._config.target_lang)
 
         self._pin_action.setChecked(self._config.always_on_top)
+
+        self._sync_toolbar_toggle()
 
         opacity_pct = max(20, min(100, int(self._config.opacity * 100)))
         self._opacity_slider.setValue(opacity_pct)
@@ -326,6 +355,13 @@ class MainWindow(QMainWindow):
             self.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
         self.show()
 
+    def _on_toolbar_provider_changed(self, is_google: bool) -> None:
+        provider = ApiProvider.GOOGLE if is_google else ApiProvider.OPENAI
+        self._config.api_provider = provider.value
+        self._apply_toolbar_provider_style(is_google)
+        self._update_provider_label()
+        self._save_config()
+
     def _on_opacity_changed(self, value: int) -> None:
         self._opacity_value_label.setText(f"{value}%")
         self.setWindowOpacity(value / 100.0)
@@ -337,6 +373,7 @@ class MainWindow(QMainWindow):
             opacity_pct = max(20, min(100, int(self._config.opacity * 100)))
             self._opacity_slider.setValue(opacity_pct)
             self.setWindowOpacity(self._config.opacity)
+            self._sync_toolbar_toggle()
             self._update_provider_label()
             self._save_config()
 
