@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from typing import cast
 
-from PyQt6.QtCore import QByteArray, QTimer, Qt
-from PyQt6.QtGui import QAction, QCloseEvent, QKeySequence, QResizeEvent, QShortcut
+from PyQt6.QtCore import QByteArray, QSize, QTimer, Qt
+from PyQt6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence, QResizeEvent, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -23,11 +23,16 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from src.config import AppConfig, PRESET_LANGUAGES
+from src.config import ApiProvider, AppConfig, ICONS_DIR, PRESET_LANGUAGES, RESOURCES_DIR
 from src.translator import TranslationManager
 from src.ui.settings_dialog import SettingsDialog
 
+
 logger = logging.getLogger(__name__)
+
+
+def _icon(name: str) -> QIcon:
+    return QIcon(str(ICONS_DIR / name))
 
 
 class AutoResizePlainTextEdit(QPlainTextEdit):
@@ -128,21 +133,23 @@ class MainWindow(QMainWindow):
 
     def _init_ui(self) -> None:
         self.setWindowTitle("LLM Translator")
+        self.setWindowIcon(QIcon(str(RESOURCES_DIR / "icon.ico")))
         self.setMinimumWidth(480)
 
         # --- ツールバー ---
         toolbar = QToolBar("メイン")
         toolbar.setMovable(False)
+        toolbar.setIconSize(QSize(20, 20))
         self.addToolBar(toolbar)
 
-        self._pin_action = QAction("📌 最前面", self)
+        self._pin_action = QAction(_icon("pin.svg"), "最前面", self)
         self._pin_action.setCheckable(True)
         self._pin_action.setToolTip("ウィンドウを常に最前面に表示")
         toolbar.addAction(self._pin_action)
 
         toolbar.addSeparator()
 
-        self._settings_action = QAction("⚙ 設定", self)
+        self._settings_action = QAction(_icon("settings.svg"), "設定", self)
         self._settings_action.setToolTip("設定ダイアログを開く")
         toolbar.addAction(self._settings_action)
 
@@ -170,7 +177,7 @@ class MainWindow(QMainWindow):
         lang_bar = QHBoxLayout()
 
         self._source_combo = self._make_lang_combo()
-        self._swap_btn = QPushButton("⇄")
+        self._swap_btn = QPushButton(_icon("swap.svg"), "")
         self._swap_btn.setFixedWidth(36)
         self._swap_btn.setToolTip("言語を入れ替え")
         self._target_combo = self._make_lang_combo()
@@ -194,13 +201,13 @@ class MainWindow(QMainWindow):
         # ボタンバー
         btn_bar = QHBoxLayout()
 
-        self._translate_btn = QPushButton("翻訳 (Ctrl+Enter)")
+        self._translate_btn = QPushButton(_icon("translate.svg"), "翻訳 (Ctrl+Enter)")
         self._translate_btn.setDefault(True)
 
-        self._copy_btn = QPushButton("コピー")
+        self._copy_btn = QPushButton(_icon("copy.svg"), "コピー")
         self._copy_btn.setToolTip("翻訳結果をクリップボードにコピー")
 
-        self._clear_btn = QPushButton("クリア")
+        self._clear_btn = QPushButton(_icon("clear.svg"), "クリア")
         self._clear_btn.setToolTip("入力と結果をクリア")
 
         btn_bar.addWidget(self._translate_btn)
@@ -211,6 +218,11 @@ class MainWindow(QMainWindow):
         # ステータスバー
         self._status_bar = QStatusBar()
         self.setStatusBar(self._status_bar)
+
+        self._provider_label = QLabel()
+        self._status_bar.addPermanentWidget(self._provider_label)
+        self._update_provider_label()
+
         self._status_bar.showMessage("準備完了")
 
         # ショートカット
@@ -220,6 +232,12 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # ヘルパー
     # ------------------------------------------------------------------
+
+    def _update_provider_label(self) -> None:
+        if self._config.provider == ApiProvider.GOOGLE:
+            self._provider_label.setText("Google翻訳")
+        else:
+            self._provider_label.setText("OpenAI互換API")
 
     @staticmethod
     def _make_lang_combo() -> QComboBox:
@@ -319,6 +337,7 @@ class MainWindow(QMainWindow):
             opacity_pct = max(20, min(100, int(self._config.opacity * 100)))
             self._opacity_slider.setValue(opacity_pct)
             self.setWindowOpacity(self._config.opacity)
+            self._update_provider_label()
             self._save_config()
 
     def _on_swap_languages(self) -> None:
@@ -367,8 +386,11 @@ class MainWindow(QMainWindow):
         if clipboard is not None:
             clipboard.setText(text)
         self._copy_btn.setText("コピー済み!")
-        QTimer.singleShot(1500, lambda: self._copy_btn.setText("コピー"))
+        QTimer.singleShot(1500, self._reset_copy_btn_text)
         self._status_bar.showMessage("クリップボードにコピーしました")
+
+    def _reset_copy_btn_text(self) -> None:
+        self._copy_btn.setText("コピー")
 
     def _on_clear(self) -> None:
         self._source_edit.clear()

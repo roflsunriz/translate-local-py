@@ -1,4 +1,4 @@
-"""設定ダイアログ — API タブ + プロンプトタブ."""
+"""設定ダイアログ — APIプロバイダー切り替え + API タブ + プロンプトタブ."""
 
 from __future__ import annotations
 
@@ -22,7 +22,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from src.config import AppConfig, DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_MESSAGE_TEMPLATE
+from src.config import ApiProvider, AppConfig, DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_MESSAGE_TEMPLATE
+from src.ui.toggle_switch import ToggleSwitch
 
 
 class SettingsDialog(QDialog):
@@ -38,15 +39,19 @@ class SettingsDialog(QDialog):
 
     def _init_ui(self) -> None:
         self.setWindowTitle("設定")
-        self.setMinimumSize(500, 440)
-        self.resize(560, 500)
+        self.setMinimumSize(500, 480)
+        self.resize(560, 540)
 
         root = QVBoxLayout(self)
 
-        tabs = QTabWidget()
-        tabs.addTab(self._build_api_tab(), "API")
-        tabs.addTab(self._build_prompt_tab(), "プロンプト")
-        root.addWidget(tabs)
+        root.addLayout(self._build_provider_row())
+        root.addSpacing(8)
+
+        self._tabs = QTabWidget()
+        self._tabs.addTab(self._build_api_tab(), "API")
+        self._prompt_tab = self._build_prompt_tab()
+        self._tabs.addTab(self._prompt_tab, "プロンプト")
+        root.addWidget(self._tabs)
 
         btn_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
@@ -54,6 +59,45 @@ class SettingsDialog(QDialog):
         btn_box.accepted.connect(self.accept)
         btn_box.rejected.connect(self.reject)
         root.addWidget(btn_box)
+
+    # --- プロバイダー切替行 ---
+
+    def _build_provider_row(self) -> QHBoxLayout:
+        row = QHBoxLayout()
+
+        self._label_openai = QLabel("OpenAI互換API")
+        self._label_openai.setStyleSheet("font-weight: bold;")
+
+        self._provider_toggle = ToggleSwitch()
+        self._provider_toggle.toggled.connect(self._on_provider_changed)
+
+        self._label_google = QLabel("Google翻訳")
+        self._label_google.setStyleSheet("color: #888;")
+
+        row.addStretch()
+        row.addWidget(self._label_openai)
+        row.addSpacing(8)
+        row.addWidget(self._provider_toggle)
+        row.addSpacing(8)
+        row.addWidget(self._label_google)
+        row.addStretch()
+
+        return row
+
+    def _on_provider_changed(self, is_google: bool) -> None:
+        if is_google:
+            self._label_openai.setStyleSheet("color: #888;")
+            self._label_google.setStyleSheet("font-weight: bold;")
+        else:
+            self._label_openai.setStyleSheet("font-weight: bold;")
+            self._label_google.setStyleSheet("color: #888;")
+
+        self._api_url_edit.setEnabled(not is_google)
+        self._model_edit.setEnabled(not is_google)
+        self._temperature_spin.setEnabled(not is_google)
+        self._max_tokens_spin.setEnabled(not is_google)
+
+        self._tabs.setTabEnabled(1, not is_google)
 
     # --- API タブ ---
 
@@ -139,6 +183,10 @@ class SettingsDialog(QDialog):
     # ------------------------------------------------------------------
 
     def _load_values(self) -> None:
+        is_google = self._config.provider == ApiProvider.GOOGLE
+        self._provider_toggle.setChecked(is_google)
+        self._on_provider_changed(is_google)
+
         self._api_url_edit.setText(self._config.api_url)
         self._model_edit.setText(self._config.model)
         self._temperature_spin.setValue(self._config.temperature)
@@ -150,8 +198,10 @@ class SettingsDialog(QDialog):
         self._user_msg_edit.setPlainText(self._config.user_message_template)
 
     def get_config(self) -> AppConfig:
+        provider = ApiProvider.GOOGLE if self._provider_toggle.isChecked() else ApiProvider.OPENAI
         return replace(
             self._config,
+            api_provider=provider.value,
             api_url=self._api_url_edit.text().strip() or self._config.api_url,
             model=self._model_edit.text().strip(),
             temperature=self._temperature_spin.value(),

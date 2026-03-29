@@ -1,4 +1,4 @@
-"""OpenAI 互換 API クライアント — テンプレート展開 + QThread ワーカー."""
+"""翻訳 API クライアント — OpenAI 互換 / Google 非公式 + QThread ワーカー."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 import requests
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
-from src.config import AppConfig
+from src.config import ApiProvider, AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,62 @@ def call_translation_api(
 
 
 # ------------------------------------------------------------------
+# Google Translate 非公式 API
+# ------------------------------------------------------------------
+
+_GOOGLE_TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
+
+
+def call_google_translate(
+    source_text: str,
+    source_lang: str,
+    target_lang: str,
+    timeout: int = 60,
+) -> str:
+    """Google Translate 非公式 API でテキストを翻訳する.
+
+    translate.googleapis.com の無料エンドポイントを使用。
+    API キー不要だがレートリミットの可能性あり。
+    """
+    params = {
+        "client": "gtx",
+        "sl": source_lang,
+        "tl": target_lang,
+        "dt": "t",
+        "q": source_text,
+    }
+    logger.debug("GET %s  params=%s", _GOOGLE_TRANSLATE_URL, params)
+
+    resp = requests.get(_GOOGLE_TRANSLATE_URL, params=params, timeout=timeout)
+    resp.raise_for_status()
+
+    data: list[Any] = resp.json()
+    segments = data[0]
+    if not segments:
+        raise ValueError("Google Translate returned empty response")
+
+    return "".join(str(seg[0]) for seg in segments if seg and seg[0])
+
+
+# ------------------------------------------------------------------
+# プロバイダー振り分け
+# ------------------------------------------------------------------
+
+def translate_text(
+    config: AppConfig,
+    source_text: str,
+    source_lang: str,
+    target_lang: str,
+) -> str:
+    """設定に応じて適切な翻訳 API を呼び出す."""
+    if config.provider == ApiProvider.GOOGLE:
+        return call_google_translate(
+            source_text, source_lang, target_lang, config.timeout,
+        )
+    return call_translation_api(config, source_text, source_lang, target_lang)
+
+
+# ------------------------------------------------------------------
 # QThread ワーカー
 # ------------------------------------------------------------------
 
@@ -99,7 +155,7 @@ class _TranslationWorker(QObject):
     def run(self) -> None:
         start = time.perf_counter()
         try:
-            result = call_translation_api(
+            result = translate_text(
                 self._config,
                 self._source_text,
                 self._source_lang,

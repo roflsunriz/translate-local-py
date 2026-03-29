@@ -5,12 +5,21 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field, asdict
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.json"
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+RESOURCES_DIR = _PROJECT_ROOT / "resources"
+ICONS_DIR = RESOURCES_DIR / "icons"
+
+
+class ApiProvider(Enum):
+    OPENAI = "openai"
+    GOOGLE = "google"
 
 DEFAULT_SYSTEM_PROMPT = (
     "あなたはプロフェッショナルの高度な翻訳エンジンである。"
@@ -56,6 +65,7 @@ PRESET_LANGUAGES: list[tuple[str, str]] = [
 
 @dataclass
 class AppConfig:
+    api_provider: str = ApiProvider.OPENAI.value
     api_url: str = "http://127.0.0.1:8080"
     model: str = ""
     temperature: float = 0.3
@@ -70,6 +80,13 @@ class AppConfig:
     opacity: float = 1.0
     always_on_top: bool = False
     window_geometry: str = ""
+
+    @property
+    def provider(self) -> ApiProvider:
+        try:
+            return ApiProvider(self.api_provider)
+        except ValueError:
+            return ApiProvider.OPENAI
 
     # ------------------------------------------------------------------
     # Persistence
