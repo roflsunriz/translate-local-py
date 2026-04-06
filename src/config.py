@@ -1,9 +1,10 @@
-"""設定管理 — JSON 永続化とデフォルト値."""
+"""設定管理 - JSON 永続化とデフォルト値."""
 
 from __future__ import annotations
 
 import json
 import logging
+import sys
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from pathlib import Path
@@ -11,9 +12,30 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.json"
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-RESOURCES_DIR = _PROJECT_ROOT / "resources"
+
+
+def _runtime_root() -> Path:
+    """Frozen app は exe の配置先、通常実行はリポジトリルートを返す."""
+
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return _PROJECT_ROOT
+
+
+def _runtime_resource_root() -> Path:
+    """PyInstaller の onefile 展開先も含めたリソースルートを返す."""
+
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            return Path(meipass)
+        return Path(sys.executable).resolve().parent
+    return _PROJECT_ROOT
+
+
+_CONFIG_PATH = _runtime_root() / "config.json"
+RESOURCES_DIR = _runtime_resource_root() / "resources"
 ICONS_DIR = RESOURCES_DIR / "icons"
 
 

@@ -1,81 +1,57 @@
-# LLM Translation Desktop App
+# translate-local-py
 
-LunaTranslator と併用するチャットコミュニケーション補助翻訳ツール。  
-ローカルの llama-server（OpenAI 互換 API）を利用してテキストを翻訳し、結果をコピーしてチャットに貼り付ける運用を想定。
+ローカルの OpenAI 互換 API サーバーまたは Google 翻訳を使って文章を翻訳するデスクトップアプリです。
 
-## 機能
+## 特長
 
-- **2つの翻訳エンジン**: OpenAI 互換 API（llama-server）と Google 翻訳（非公式 API）を設定で切り替え可能
-- 編集可能コンボボックスによる言語選択（プリセット＋言語コード直接入力）
-- カスタマイズ可能なシステムプロンプト・ユーザーメッセージテンプレート（OpenAI 互換 API 使用時）
-- AlwaysOnTop トグル（ゲーム・チャット画面の上に常時表示）
-- ワンクリックで翻訳結果をクリップボードにコピー
-- 翻訳結果の手動微修正に対応（訳文エリアは編集可能）
+- OpenAI 互換 API と Google 翻訳を切り替え可能
+- 言語コードを直接入力できるコンボボックス
+- システムプロンプトとユーザーメッセージテンプレートを設定画面から編集可能
+- 最前面表示、透明度調整、コピー、クリアに対応
+- `resources/icon.ico` をアプリのウィンドウアイコンと Windows ビルドのアイコンに使用
 
-## 前提条件
+## 動作環境
 
-- Python 3.12+
-- llama-server（または OpenAI 互換 API サーバー）が起動済み
+- Python 3.12 以上
+- Windows 11 / Windows 10
+- OpenAI 互換 API を使う場合は、ローカルまたはネットワーク上で API サーバーが起動済みであること
 
 ## セットアップ
 
-```bash
-# 仮想環境の作成と有効化
+```powershell
 python -m venv .venv
-.venv\Scripts\Activate.ps1   # Windows PowerShell
-
-# 依存パッケージのインストール
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
 ## 起動
 
-```bash
+```powershell
 python main.py
 ```
 
-## 設定
+## 設定ファイル
 
-初回起動時に `config.json` が自動生成される。  
-アプリ内の設定ダイアログ（歯車アイコン）から以下を変更可能:
+初回起動時に `config.json` が自動生成されます。
 
-### 翻訳エンジン
+- 通常実行時はリポジトリ直下に保存
+- PyInstaller で配布した実行ファイルでは、実行ファイルと同じフォルダに保存
 
-設定ダイアログ上部のトグルスイッチで切り替え:
+## ビルド
 
-| エンジン | 説明 |
-|---------|------|
-| OpenAI 互換 API | llama-server 等のローカル LLM サーバーを使用。プロンプトのカスタマイズ可能 |
-| Google 翻訳 | Google Translate の非公式 API を使用。API キー不要 |
+PyInstaller の単体実行ファイルを作る場合は以下を使います。
 
-### API 設定（OpenAI 互換 API 選択時）
+```powershell
+pyinstaller --noconfirm --clean --windowed --name translate-local-py --icon resources/icon.ico --add-data "resources;resources" main.py
+```
 
-| 項目 | デフォルト値 | 説明 |
-|------|-------------|------|
-| API URL | `http://127.0.0.1:8080` | llama-server のエンドポイント |
-| モデル名 | (空) | llama-server のデフォルトモデルを使用 |
-| Temperature | 0.3 | 生成の多様性 |
-| Max Tokens | 1024 | 最大生成トークン数 |
-| タイムアウト | 60秒 | API リクエストタイムアウト |
+## CI / CD
 
-### プロンプトテンプレート
+GitHub Actions で以下を実行します。
 
-設定ダイアログの「プロンプト」タブで、システムプロンプトとユーザーメッセージテンプレートを自由に編集可能。  
-以下のプレースホルダーが利用可能:
+- CI: Python 3.12 / 3.13 の matrix でインポートとコンパイルを確認
+- Release: `v*` タグの push で PyInstaller ビルドを実行し、成果物を GitHub Release に添付
 
-- `{{source_language}}` — ソース言語コード（例: `ja`）
-- `{{target_language}}` — ターゲット言語コード（例: `en`）
-- `{{input_text}}` — 翻訳対象のテキスト
+## ライセンス
 
-## ショートカットキー
-
-| キー | 動作 |
-|------|------|
-| Ctrl+Enter | 翻訳実行 |
-
-## トラブルシュート
-
-- **接続エラー（OpenAI互換API）**: llama-server が起動しているか、API URL が正しいか確認
-- **翻訳結果が空**: モデルがプロンプト形式に対応しているか確認。設定ダイアログでテンプレートを調整
-- **Google翻訳が失敗する**: インターネット接続を確認。非公式 API のためレートリミットの可能性あり
-- **設定リセット**: `config.json` を削除して再起動するとデフォルト設定に戻る
+MIT
