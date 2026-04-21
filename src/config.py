@@ -40,8 +40,49 @@ ICONS_DIR = RESOURCES_DIR / "icons"
 
 
 class ApiProvider(Enum):
-    OPENAI = "openai"
+    LOCAL = "local"
     GOOGLE = "google"
+    OPENROUTER = "openrouter"
+    CEREBRAS = "cerebras"
+    SAKURA = "sakura"
+    CUSTOM = "custom"
+
+
+PROVIDER_LABELS: dict[ApiProvider, str] = {
+    ApiProvider.LOCAL: "ローカル",
+    ApiProvider.GOOGLE: "Google翻訳",
+    ApiProvider.OPENROUTER: "OpenRouter",
+    ApiProvider.CEREBRAS: "Cerebras",
+    ApiProvider.SAKURA: "Sakura",
+    ApiProvider.CUSTOM: "自由入力",
+}
+
+PROVIDER_ORDER: list[ApiProvider] = [
+    ApiProvider.LOCAL,
+    ApiProvider.GOOGLE,
+    ApiProvider.OPENROUTER,
+    ApiProvider.CEREBRAS,
+    ApiProvider.SAKURA,
+    ApiProvider.CUSTOM,
+]
+
+CEREBRAS_MODELS: list[str] = [
+    "llama3.1-8b",
+    "gpt-oss-120b",
+    "qwen-3-235b-a22b-instruct-2507",
+    "zai-glm-4.7",
+]
+
+SAKURA_MODELS: list[str] = [
+    "Qwen3-Coder-30B-A3B-Instruct",
+    "Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "gpt-oss-120b",
+    "llm-jp-3.1-8x13b-instruct4",
+    "preview/Phi-4-mini-instruct-cpu",
+    "preview/Phi-4-multimodal-instruct",
+    "preview/Qwen3-0.6B-cpu",
+    "preview/Qwen3-VL-30B-A3B-Instruct",
+]
 
 DEFAULT_SYSTEM_PROMPT = (
     "あなたはプロフェッショナルの高度な翻訳エンジンである。"
@@ -87,9 +128,17 @@ PRESET_LANGUAGES: list[tuple[str, str]] = [
 
 @dataclass
 class AppConfig:
-    api_provider: str = ApiProvider.OPENAI.value
-    api_url: str = "http://127.0.0.1:8080"
-    model: str = ""
+    api_provider: str = ApiProvider.LOCAL.value
+    local_api_url: str = "http://127.0.0.1:8080"
+    openrouter_api_key: str = ""
+    openrouter_model: str = ""
+    cerebras_api_key: str = ""
+    cerebras_model: str = CEREBRAS_MODELS[0]
+    sakura_api_key: str = ""
+    sakura_model: str = SAKURA_MODELS[0]
+    custom_api_url: str = ""
+    custom_api_key: str = ""
+    custom_model: str = ""
     temperature: float = 0.3
     max_tokens: int = 1024
     timeout: int = 60
@@ -108,7 +157,10 @@ class AppConfig:
         try:
             return ApiProvider(self.api_provider)
         except ValueError:
-            return ApiProvider.OPENAI
+            return ApiProvider.LOCAL
+
+    def provider_label(self) -> str:
+        return PROVIDER_LABELS.get(self.provider, "ローカル")
 
     # ------------------------------------------------------------------
     # Persistence
@@ -134,6 +186,26 @@ class AppConfig:
             logger.warning("Failed to read config — using defaults", exc_info=True)
             return cls()
 
+        raw = cls._migrate_legacy_fields(raw)
+
         known_fields = {f.name for f in cls.__dataclass_fields__.values()}
         filtered = {k: v for k, v in raw.items() if k in known_fields}
         return cls(**filtered)
+
+    @staticmethod
+    def _migrate_legacy_fields(raw: dict[str, Any]) -> dict[str, Any]:
+        migrated = dict(raw)
+
+        legacy_provider = migrated.get("api_provider")
+        if legacy_provider == "openai":
+            migrated["api_provider"] = ApiProvider.LOCAL.value
+
+        legacy_api_url = migrated.pop("api_url", None)
+        if legacy_api_url and not migrated.get("local_api_url"):
+            migrated["local_api_url"] = legacy_api_url
+
+        legacy_model = migrated.pop("model", None)
+        if legacy_model and not migrated.get("custom_model"):
+            migrated["custom_model"] = legacy_model
+
+        return migrated
