@@ -9,8 +9,6 @@ from PyQt6.QtCore import QByteArray, QSize, QTimer, Qt
 from PyQt6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence, QResizeEvent, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
-    QButtonGroup,
-    QCheckBox,
     QComboBox,
     QHBoxLayout,
     QLabel,
@@ -19,21 +17,14 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSlider,
+    QSplitter,
     QStatusBar,
     QToolBar,
     QVBoxLayout,
     QWidget,
 )
 
-from src.config import (
-    PROVIDER_ORDER,
-    ApiProvider,
-    AppConfig,
-    ICONS_DIR,
-    PRESET_LANGUAGES,
-    PROVIDER_LABELS,
-    RESOURCES_DIR,
-)
+from src.config import AppConfig, ICONS_DIR, PRESET_LANGUAGES, RESOURCES_DIR
 from src.translator import TranslationManager
 from src.ui.settings_dialog import SettingsDialog
 
@@ -57,12 +48,12 @@ class AutoResizePlainTextEdit(QPlainTextEdit):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._current_height = 0
+        self._preferred_height = 0
         self._adjusting = False
 
         self.setSizePolicy(
             self.sizePolicy().horizontalPolicy(),
-            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Expanding,
         )
         self.textChanged.connect(self._schedule_adjust)
 
@@ -71,8 +62,16 @@ class AutoResizePlainTextEdit(QPlainTextEdit):
         doc_margin = int(doc.documentMargin()) if doc is not None else 0
         frame = self.frameWidth() * 2
         initial = line_h * self._MIN_LINES + doc_margin * 2 + frame
-        self._current_height = initial
-        self.setFixedHeight(initial)
+        self._preferred_height = initial
+        self.setMinimumHeight(initial)
+
+    def sizeHint(self) -> QSize:  # type: ignore[override]
+        hint = super().sizeHint()
+        return QSize(hint.width(), max(hint.height(), self._preferred_height))
+
+    def minimumSizeHint(self) -> QSize:  # type: ignore[override]
+        hint = super().minimumSizeHint()
+        return QSize(hint.width(), max(hint.height(), self._preferred_height))
 
     def resizeEvent(self, event: QResizeEvent | None) -> None:  # type: ignore[override]
         super().resizeEvent(event)
@@ -111,17 +110,19 @@ class AutoResizePlainTextEdit(QPlainTextEdit):
             frame = self.frameWidth() * 2
 
             new_height = line_h * clamped + doc_margin * 2 + frame
-            if new_height == self._current_height:
+            if new_height == self._preferred_height:
                 return
 
-            old_height = self._current_height
-            self._current_height = new_height
-            self.setFixedHeight(new_height)
+            old_height = self._preferred_height
+            self._preferred_height = new_height
+            self.setMinimumHeight(new_height)
+            self.updateGeometry()
 
             window = self.window()
             if window is not None and window.isVisible() and old_height > 0:
                 delta = new_height - old_height
-                window.resize(window.width(), window.height() + delta)
+                if delta > 0:
+                    window.resize(window.width(), window.height() + delta)
         finally:
             self._adjusting = False
 
@@ -165,19 +166,6 @@ class MainWindow(QMainWindow):
 
         toolbar.addSeparator()
 
-        toolbar.addWidget(QLabel(" モード:"))
-        self._toolbar_provider_group = QButtonGroup(self)
-        self._toolbar_provider_group.setExclusive(True)
-        self._toolbar_provider_checks: dict[ApiProvider, QCheckBox] = {}
-        for provider in PROVIDER_ORDER:
-            checkbox = QCheckBox(PROVIDER_LABELS[provider])
-            checkbox.setToolTip(f"{PROVIDER_LABELS[provider]} に切り替え")
-            self._toolbar_provider_group.addButton(checkbox)
-            self._toolbar_provider_checks[provider] = checkbox
-            toolbar.addWidget(checkbox)
-
-        toolbar.addSeparator()
-
         opacity_label = QLabel(" 透明度:")
         toolbar.addWidget(opacity_label)
         self._opacity_slider = QSlider(Qt.Orientation.Horizontal)
@@ -210,17 +198,6 @@ class MainWindow(QMainWindow):
         lang_bar.addWidget(self._target_combo, 1)
         layout.addLayout(lang_bar)
 
-        # テキストエリア (内容に応じて自動リサイズ)
-        self._source_edit = AutoResizePlainTextEdit()
-        self._source_edit.setPlaceholderText("翻訳したいテキストを入力…")
-        layout.addWidget(self._source_edit)
-
-        self._target_edit = AutoResizePlainTextEdit()
-        self._target_edit.setPlaceholderText("翻訳結果がここに表示されます")
-        layout.addWidget(self._target_edit)
-
-        layout.addStretch(1)
-
         # ボタンバー
         btn_bar = QHBoxLayout()
 
@@ -237,6 +214,20 @@ class MainWindow(QMainWindow):
         btn_bar.addWidget(self._copy_btn)
         btn_bar.addWidget(self._clear_btn)
         layout.addLayout(btn_bar)
+
+        # テキストエリア
+        editor_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._source_edit = AutoResizePlainTextEdit()
+        self._source_edit.setPlaceholderText("翻訳したいテキストを入力…")
+
+        self._target_edit = AutoResizePlainTextEdit()
+        self._target_edit.setPlaceholderText("翻訳結果がここに表示されます")
+
+        editor_splitter.addWidget(self._source_edit)
+        editor_splitter.addWidget(self._target_edit)
+        editor_splitter.setChildrenCollapsible(False)
+        editor_splitter.setSizes([1, 1])
+        layout.addWidget(editor_splitter, 1)
 
         # ステータスバー
         self._status_bar = QStatusBar()
@@ -258,12 +249,6 @@ class MainWindow(QMainWindow):
 
     def _update_provider_label(self) -> None:
         self._provider_label.setText(self._config.provider_label())
-
-    def _sync_toolbar_provider_checks(self) -> None:
-        for provider, checkbox in self._toolbar_provider_checks.items():
-            checkbox.blockSignals(True)
-            checkbox.setChecked(provider == self._config.provider)
-            checkbox.blockSignals(False)
 
     @staticmethod
     def _make_lang_combo() -> QComboBox:
@@ -310,10 +295,6 @@ class MainWindow(QMainWindow):
         self._clear_btn.clicked.connect(self._on_clear)
         self._translator.translation_finished.connect(self._on_translation_finished)
         self._translator.translation_error.connect(self._on_translation_error)
-        for provider, checkbox in self._toolbar_provider_checks.items():
-            checkbox.toggled.connect(
-                lambda checked, p=provider: self._on_toolbar_provider_changed(p, checked),
-            )
 
     # ------------------------------------------------------------------
     # 設定の適用・保存
@@ -324,8 +305,6 @@ class MainWindow(QMainWindow):
         self._set_lang_combo(self._target_combo, self._config.target_lang)
 
         self._pin_action.setChecked(self._config.always_on_top)
-
-        self._sync_toolbar_provider_checks()
 
         opacity_pct = max(20, min(100, int(self._config.opacity * 100)))
         self._opacity_slider.setValue(opacity_pct)
@@ -358,13 +337,6 @@ class MainWindow(QMainWindow):
             self.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
         self.show()
 
-    def _on_toolbar_provider_changed(self, provider: ApiProvider, checked: bool) -> None:
-        if not checked:
-            return
-        self._config.api_provider = provider.value
-        self._update_provider_label()
-        self._save_config()
-
     def _on_opacity_changed(self, value: int) -> None:
         self._opacity_value_label.setText(f"{value}%")
         self.setWindowOpacity(value / 100.0)
@@ -376,7 +348,6 @@ class MainWindow(QMainWindow):
             opacity_pct = max(20, min(100, int(self._config.opacity * 100)))
             self._opacity_slider.setValue(opacity_pct)
             self.setWindowOpacity(self._config.opacity)
-            self._sync_toolbar_provider_checks()
             self._update_provider_label()
             self._save_config()
 
