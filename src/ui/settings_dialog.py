@@ -282,6 +282,18 @@ class SettingsDialog(QDialog):
         combo.addItem(value)
         combo.setCurrentIndex(combo.count() - 1)
 
+    @staticmethod
+    def _set_combo_value_or_default(combo: QComboBox, value: str, default_value: str) -> None:
+        index = combo.findText(value)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+            return
+        default_index = combo.findText(default_value)
+        if default_index >= 0:
+            combo.setCurrentIndex(default_index)
+            return
+        combo.setCurrentIndex(0)
+
     def _load_values(self) -> None:
         self._provider_checks[self._config.provider].setChecked(True)
         self._provider_pages.setCurrentIndex(self._page_indexes[self._config.provider])
@@ -291,7 +303,11 @@ class SettingsDialog(QDialog):
         self._openrouter_api_key_edit.setText(self._config.openrouter_api_key)
         self._openrouter_model_edit.setText(self._config.openrouter_model)
         self._cerebras_api_key_edit.setText(self._config.cerebras_api_key)
-        self._set_combo_value(self._cerebras_model_combo, self._config.cerebras_model)
+        self._set_combo_value_or_default(
+            self._cerebras_model_combo,
+            self._config.cerebras_model,
+            CEREBRAS_MODELS[0],
+        )
         self._sakura_api_key_edit.setText(self._config.sakura_api_key)
         self._set_combo_value(self._sakura_model_combo, self._config.sakura_model)
         self._custom_api_url_edit.setText(self._config.custom_api_url)

@@ -67,11 +67,14 @@ PROVIDER_ORDER: list[ApiProvider] = [
 ]
 
 CEREBRAS_MODELS: list[str] = [
-    "llama3.1-8b",
     "gpt-oss-120b",
-    "qwen-3-235b-a22b-instruct-2507",
     "zai-glm-4.7",
 ]
+
+DEPRECATED_CEREBRAS_MODELS: set[str] = {
+    "llama3.1-8b",
+    "qwen-3-235b-a22b-instruct-2507",
+}
 
 SAKURA_MODELS: list[str] = [
     "Qwen3-Coder-30B-A3B-Instruct",
@@ -207,5 +210,9 @@ class AppConfig:
         legacy_model = migrated.pop("model", None)
         if legacy_model and not migrated.get("custom_model"):
             migrated["custom_model"] = legacy_model
+
+        cerebras_model = migrated.get("cerebras_model")
+        if cerebras_model in DEPRECATED_CEREBRAS_MODELS:
+            migrated["cerebras_model"] = CEREBRAS_MODELS[0]
 
         return migrated
