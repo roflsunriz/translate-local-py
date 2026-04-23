@@ -10,8 +10,6 @@ build/
 .env
 config.json
 
-*.spec
-
 .venv/
 venv/
 env/
