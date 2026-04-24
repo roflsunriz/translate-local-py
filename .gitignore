@@ -21,3 +21,8 @@ env/
 *~
 
 *.log
+
+# Claw code settings folder
+.claw/
+.sandbox-home/
+.sandbox-tmp/
