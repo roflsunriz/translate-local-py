@@ -15,14 +15,6 @@ logger = logging.getLogger(__name__)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-def _runtime_root() -> Path:
-    """Frozen app は exe の配置先、通常実行はリポジトリルートを返す."""
-
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-    return _PROJECT_ROOT
-
-
 def _runtime_resource_root() -> Path:
     """PyInstaller の onefile 展開先も含めたリソースルートを返す."""
 
@@ -34,7 +26,7 @@ def _runtime_resource_root() -> Path:
     return _PROJECT_ROOT
 
 
-_CONFIG_PATH = _runtime_root() / "config.json"
+_CONFIG_PATH = Path.home() / "mini-tools" / "translate-local-py" / "settings.json"
 RESOURCES_DIR = _runtime_resource_root() / "resources"
 ICONS_DIR = RESOURCES_DIR / "icons"
 
@@ -171,6 +163,7 @@ class AppConfig:
 
     def save(self, path: Path | None = None) -> None:
         target = path or _CONFIG_PATH
+        target.parent.mkdir(parents=True, exist_ok=True)
         data = asdict(self)
         target.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         logger.info("Config saved to %s", target)
