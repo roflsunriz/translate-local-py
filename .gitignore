@@ -26,3 +26,6 @@ env/
 .claw/
 .sandbox-home/
 .sandbox-tmp/
+.clawd-todos.json
+
+build_log.txt
