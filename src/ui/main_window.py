@@ -374,6 +374,8 @@ class MainWindow(QMainWindow):
             self._status_bar.showMessage("言語を選択してください")
             return
 
+        # 新しい翻訳を開始する前に前回の結果を消して、追記表示に見えないようにする。
+        self._target_edit.clear()
         self._translate_btn.setEnabled(False)
         self._status_bar.showMessage("翻訳中…")
         self._translator.translate(self._config, source_text, source_lang, target_lang)
