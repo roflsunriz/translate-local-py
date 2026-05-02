@@ -121,8 +121,9 @@ class AutoResizePlainTextEdit(QPlainTextEdit):
             window = self.window()
             if window is not None and window.isVisible() and old_height > 0:
                 delta = new_height - old_height
-                if delta > 0:
-                    window.resize(window.width(), window.height() + delta)
+                # Always apply the height delta to the window so it shrinks
+                # when the editor reduces in height as well as expands.
+                window.resize(window.width(), window.height() + delta)
         finally:
             self._adjusting = False
 
