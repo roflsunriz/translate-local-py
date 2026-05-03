@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
+    QListWidget,
     QMainWindow,
     QPlainTextEdit,
     QPushButton,
@@ -24,9 +25,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from src.config import AppConfig, ICONS_DIR, PRESET_LANGUAGES, RESOURCES_DIR
+from src.config import AppConfig, ApiProvider, ANNOTATION_TYPE_LABELS, ICONS_DIR, PRESET_LANGUAGES, RESOURCES_DIR
 from src.translator import TranslationManager
 from src.ui.settings_dialog import SettingsDialog
+from src.ui.toggle_switch import ToggleSwitch
 
 
 logger = logging.getLogger(__name__)
@@ -214,6 +216,15 @@ class MainWindow(QMainWindow):
         btn_bar.addWidget(self._translate_btn)
         btn_bar.addWidget(self._copy_btn)
         btn_bar.addWidget(self._clear_btn)
+
+        btn_bar.addStretch()
+
+        annotation_label = QLabel("解説:")
+        btn_bar.addWidget(annotation_label)
+        self._annotation_toggle = ToggleSwitch()
+        self._annotation_toggle.setToolTip("スラング・慣用表現・難解語の解説を有効にする")
+        btn_bar.addWidget(self._annotation_toggle)
+
         layout.addLayout(btn_bar)
 
         # テキストエリア
@@ -224,10 +235,13 @@ class MainWindow(QMainWindow):
         self._target_edit = AutoResizePlainTextEdit()
         self._target_edit.setPlaceholderText("翻訳結果がここに表示されます")
 
+        self._annotation_panel = self._build_annotation_panel()
+
         editor_splitter.addWidget(self._source_edit)
         editor_splitter.addWidget(self._target_edit)
+        editor_splitter.addWidget(self._annotation_panel)
         editor_splitter.setChildrenCollapsible(False)
-        editor_splitter.setSizes([1, 1])
+        editor_splitter.setSizes([1, 1, 0])
         layout.addWidget(editor_splitter, 1)
 
         # ステータスバー
@@ -263,6 +277,24 @@ class MainWindow(QMainWindow):
             line_edit.setPlaceholderText("言語コード")
         return combo
 
+    def _build_annotation_panel(self) -> QWidget:
+        panel = QWidget()
+        panel.setMinimumWidth(180)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 4, 4, 4)
+
+        header = QLabel("解説")
+        header.setStyleSheet("font-weight: bold; font-size: 13px;")
+        layout.addWidget(header)
+
+        self._annotation_list = QListWidget()
+        self._annotation_list.setWordWrap(True)
+        self._annotation_list.setSpacing(4)
+        layout.addWidget(self._annotation_list)
+
+        panel.setVisible(False)
+        return panel
+
     def _current_lang_code(self, combo: QComboBox) -> str:
         """コンボボックスから言語コードを取得する.
 
@@ -294,6 +326,7 @@ class MainWindow(QMainWindow):
         self._translate_btn.clicked.connect(self._on_translate)
         self._copy_btn.clicked.connect(self._on_copy)
         self._clear_btn.clicked.connect(self._on_clear)
+        self._annotation_toggle.toggled.connect(self._on_annotation_toggled)
         self._translator.translation_finished.connect(self._on_translation_finished)
         self._translator.translation_error.connect(self._on_translation_error)
 
@@ -306,6 +339,9 @@ class MainWindow(QMainWindow):
         self._set_lang_combo(self._target_combo, self._config.target_lang)
 
         self._pin_action.setChecked(self._config.always_on_top)
+
+        self._annotation_toggle.setChecked(self._config.enable_annotations)
+        self._update_annotation_panel_visibility()
 
         opacity_pct = max(20, min(100, int(self._config.opacity * 100)))
         self._opacity_slider.setValue(opacity_pct)
@@ -322,6 +358,7 @@ class MainWindow(QMainWindow):
         self._config.source_lang = self._current_lang_code(self._source_combo)
         self._config.target_lang = self._current_lang_code(self._target_combo)
         self._config.always_on_top = self._pin_action.isChecked()
+        self._config.enable_annotations = self._annotation_toggle.isChecked()
         self._config.opacity = self._opacity_slider.value() / 100.0
         self._config.window_geometry = self.saveGeometry().toBase64().data().decode("ascii")
         self._config.save()
@@ -349,6 +386,8 @@ class MainWindow(QMainWindow):
             opacity_pct = max(20, min(100, int(self._config.opacity * 100)))
             self._opacity_slider.setValue(opacity_pct)
             self.setWindowOpacity(self._config.opacity)
+            self._annotation_toggle.setChecked(self._config.enable_annotations)
+            self._update_annotation_panel_visibility()
             self._update_provider_label()
             self._save_config()
 
@@ -357,6 +396,11 @@ class MainWindow(QMainWindow):
         tgt_code = self._current_lang_code(self._target_combo)
         self._set_lang_combo(self._source_combo, tgt_code)
         self._set_lang_combo(self._target_combo, src_code)
+
+    def _on_annotation_toggled(self, checked: bool) -> None:
+        self._config.enable_annotations = checked
+        self._update_annotation_panel_visibility()
+        self._save_config()
 
     def _on_translate(self) -> None:
         source_text = self._source_edit.toPlainText().strip()
@@ -375,19 +419,26 @@ class MainWindow(QMainWindow):
             self._status_bar.showMessage("言語を選択してください")
             return
 
-        # 新しい翻訳を開始する前に前回の結果を消して、追記表示に見えないようにする。
+        if self._config.enable_annotations and self._config.provider == ApiProvider.GOOGLE:
+            self._annotation_toggle.setChecked(False)
+            self._update_annotation_panel_visibility()
+            self._config.enable_annotations = False
+
         self._target_edit.clear()
+        self._annotation_list.clear()
         self._translate_btn.setEnabled(False)
         self._status_bar.showMessage("翻訳中…")
         self._translator.translate(self._config, source_text, source_lang, target_lang)
 
-    def _on_translation_finished(self, result: str, elapsed: float) -> None:
-        self._target_edit.setPlainText(result)
+    def _on_translation_finished(self, translation: str, annotations: list, elapsed: float) -> None:
+        self._target_edit.setPlainText(translation)
+        self._update_annotation_list(annotations)
         self._translate_btn.setEnabled(True)
         self._status_bar.showMessage(f"翻訳完了 ({elapsed:.1f}秒)")
 
     def _on_translation_error(self, message: str) -> None:
         self._target_edit.setPlainText("")
+        self._annotation_list.clear()
         self._translate_btn.setEnabled(True)
         self._status_bar.showMessage(message)
 
@@ -409,11 +460,31 @@ class MainWindow(QMainWindow):
     def _on_clear(self) -> None:
         self._source_edit.clear()
         self._target_edit.clear()
+        self._annotation_list.clear()
         self._status_bar.showMessage("クリア")
 
-    # ------------------------------------------------------------------
-    # ウィンドウイベント
-    # ------------------------------------------------------------------
+    def _update_annotation_panel_visibility(self) -> None:
+        visible = self._config.enable_annotations and self._config.provider != ApiProvider.GOOGLE
+        self._annotation_panel.setVisible(visible)
+        if visible:
+            parent = self._annotation_panel.parent()
+            if isinstance(parent, QSplitter):
+                current_sizes = parent.sizes()
+                if current_sizes[2] == 0:
+                    parent.setSizes([current_sizes[0], current_sizes[1], 180])
+
+    def _update_annotation_list(self, annotations: list) -> None:
+        self._annotation_list.clear()
+        if not annotations:
+            return
+
+        for ann in annotations:
+            expr = ann.get("expression", "")
+            ann_type = ann.get("type", "")
+            explanation = ann.get("explanation", "")
+            type_label = ANNOTATION_TYPE_LABELS.get(ann_type, ann_type)
+            text = f"■ {expr}  [{type_label}]\n   {explanation}"
+            self._annotation_list.addItem(text)
 
     def closeEvent(self, event: QCloseEvent | None) -> None:  # type: ignore[override]
         self._save_config()

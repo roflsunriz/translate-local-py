@@ -119,6 +119,9 @@ class SettingsDialog(QDialog):
         self._timeout_spin.setSuffix(" 秒")
         form.addRow("タイムアウト:", self._timeout_spin)
 
+        self._annotation_check = QCheckBox("デフォルトでスラング・慣用句の解説を有効にする")
+        form.addRow("", self._annotation_check)
+
         opacity_row = QHBoxLayout()
         self._opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self._opacity_slider.setRange(20, 100)
@@ -321,6 +324,7 @@ class SettingsDialog(QDialog):
         self._opacity_slider.setValue(opacity_pct)
         self._system_prompt_edit.setPlainText(self._config.system_prompt)
         self._user_msg_edit.setPlainText(self._config.user_message_template)
+        self._annotation_check.setChecked(self._config.enable_annotations)
 
     def get_config(self) -> AppConfig:
         return replace(
@@ -342,6 +346,7 @@ class SettingsDialog(QDialog):
             opacity=self._opacity_slider.value() / 100.0,
             system_prompt=self._system_prompt_edit.toPlainText(),
             user_message_template=self._user_msg_edit.toPlainText(),
+            enable_annotations=self._annotation_check.isChecked(),
         )
 
     def _reset_prompts(self) -> None:

@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
+from dataclasses import dataclass
 from typing import Any
 
 import requests
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
-from src.config import ApiProvider, AppConfig
+from src.config import (
+    DEFAULT_ANNOTATION_SYSTEM_PROMPT,
+    ApiProvider,
+    AppConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +32,12 @@ def expand_template(
     result = result.replace("{{target_language}}", target_language)
     result = result.replace("{{input_text}}", input_text)
     return result
+
+
+@dataclass
+class TranslationResult:
+    translation: str
+    annotations: list[dict]
 
 
 def _resolve_api_settings(config: AppConfig) -> tuple[str, str, str]:
@@ -83,13 +95,20 @@ def call_translation_api(
     source_text: str,
     source_lang: str,
     target_lang: str,
-) -> str:
-    """同期的に翻訳 API を呼び出し、翻訳結果文字列を返す."""
-    system_content = expand_template(
-        config.system_prompt,
-        source_language=source_lang,
-        target_language=target_lang,
-    )
+) -> TranslationResult:
+    """同期的に翻訳 API を呼び出し、翻訳結果を返す."""
+    if config.enable_annotations:
+        system_content = expand_template(
+            DEFAULT_ANNOTATION_SYSTEM_PROMPT,
+            source_language=source_lang,
+            target_language=target_lang,
+        )
+    else:
+        system_content = expand_template(
+            config.system_prompt,
+            source_language=source_lang,
+            target_language=target_lang,
+        )
     user_content = expand_template(
         config.user_message_template,
         source_language=source_lang,
@@ -126,7 +145,33 @@ def call_translation_api(
         raise ValueError("API response contains no choices")
 
     message = choices[0].get("message", {})
-    return str(message.get("content", "")).strip()
+    raw_content = str(message.get("content", "")).strip()
+
+    if not config.enable_annotations:
+        return TranslationResult(translation=raw_content, annotations=[])
+
+    return _parse_annotation_response(raw_content)
+
+
+def _parse_annotation_response(raw_content: str) -> TranslationResult:
+    """LLM の JSON 応答をパースし、TranslationResult を返す。失敗時は生テキストでフォールバック。"""
+    try:
+        parsed = json.loads(raw_content)
+        if isinstance(parsed, dict):
+            translation = str(parsed.get("translation", raw_content))
+            annotations = parsed.get("annotations", [])
+            if isinstance(annotations, list):
+                valid_annotations = [
+                    a for a in annotations
+                    if isinstance(a, dict)
+                    and a.get("expression") and a.get("type") and a.get("explanation")
+                ]
+                return TranslationResult(translation=translation, annotations=valid_annotations)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        logger.debug("Failed to parse annotation JSON; falling back to raw text")
+
+    return TranslationResult(translation=raw_content, annotations=[])
+
 
 
 # ------------------------------------------------------------------
@@ -176,12 +221,13 @@ def translate_text(
     source_text: str,
     source_lang: str,
     target_lang: str,
-) -> str:
+) -> TranslationResult:
     """設定に応じて適切な翻訳 API を呼び出す."""
     if config.provider == ApiProvider.GOOGLE:
-        return call_google_translate(
+        result = call_google_translate(
             source_text, source_lang, target_lang, config.timeout,
         )
+        return TranslationResult(translation=result, annotations=[])
     return call_translation_api(config, source_text, source_lang, target_lang)
 
 
@@ -190,7 +236,7 @@ def translate_text(
 # ------------------------------------------------------------------
 
 class _TranslationWorker(QObject):
-    finished = pyqtSignal(str, float)
+    finished = pyqtSignal(str, list, float)
     error = pyqtSignal(str)
 
     def __init__(
@@ -216,7 +262,7 @@ class _TranslationWorker(QObject):
                 self._target_lang,
             )
             elapsed = time.perf_counter() - start
-            self.finished.emit(result, elapsed)
+            self.finished.emit(result.translation, result.annotations, elapsed)
         except requests.ConnectionError:
             self.error.emit("接続エラー: API サーバーに接続できません。URL を確認してください。")
         except requests.Timeout:
@@ -233,7 +279,7 @@ class TranslationManager(QObject):
     翻訳リクエストごとに QThread を生成・管理する。
     """
 
-    translation_finished = pyqtSignal(str, float)
+    translation_finished = pyqtSignal(str, list, float)
     translation_error = pyqtSignal(str)
 
     def __init__(self, parent: QObject | None = None) -> None:
@@ -268,8 +314,8 @@ class TranslationManager(QObject):
 
         self._thread.start()
 
-    def _on_finished(self, result: str, elapsed: float) -> None:
-        self.translation_finished.emit(result, elapsed)
+    def _on_finished(self, translation: str, annotations: list, elapsed: float) -> None:
+        self.translation_finished.emit(translation, annotations, elapsed)
 
     def _on_error(self, message: str) -> None:
         self.translation_error.emit(message)

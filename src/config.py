@@ -107,6 +107,26 @@ DEFAULT_USER_MESSAGE_TEMPLATE = (
     "<|plamo:op|>output lang={{target_language}}"
 )
 
+DEFAULT_ANNOTATION_SYSTEM_PROMPT = (
+    "あなたはプロフェッショナルの高度な翻訳エンジンである。"
+    "与えられた原文を {{target_language}} に正確に翻訳し、"
+    "さらに原文に含まれるスラング・慣用表現・難解な語句を特定して解説せよ。\n"
+    "出力は必ず以下のJSON形式のみとし、JSONの前後に説明文を一切付けないこと:\n"
+    '{"translation": "翻訳結果", "annotations": [\n'
+    '  {"expression": "該当する語句", "type": "slang|idiom|difficult_word", '
+    '"explanation": "意味や使い方の日本語解説"}\n'
+    ']}\n'
+    "翻訳文中にスラング・慣用表現・難解語が一切ない場合は annotations を空配列 [] にせよ。"
+    "type は slang, idiom, difficult_word のいずれかとせよ。"
+    "translation の文体は常体（～だ・～である）を使用せよ。"
+)
+
+ANNOTATION_TYPE_LABELS: dict[str, str] = {
+    "slang": "スラング",
+    "idiom": "慣用表現",
+    "difficult_word": "難解語",
+}
+
 PRESET_LANGUAGES: list[tuple[str, str]] = [
     ("日本語", "ja"),
     ("英語", "en"),
@@ -145,6 +165,7 @@ class AppConfig:
     )
     opacity: float = 1.0
     always_on_top: bool = False
+    enable_annotations: bool = False
     window_geometry: str = ""
 
     @property
