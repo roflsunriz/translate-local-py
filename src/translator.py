@@ -40,19 +40,26 @@ _LANGUAGE_ALIAS_MAP: dict[str, tuple[str, str]] = {
 }
 
 
-def normalize_language_for_prompt(code: str) -> str:
-    """言語コードを `code (English name)` 形式へ正規化する."""
+def format_language_for_prompt(code: str, language_format: str) -> str:
+    """言語表記を設定に応じて変換する."""
     raw = code.strip()
     if not raw:
         return ""
 
     normalized_code = raw.lower()
     canonical = _LANGUAGE_ALIAS_MAP.get(normalized_code)
-    if canonical is None:
-        return raw
 
-    display_code, english_name = canonical
-    return f"{display_code} ({english_name})"
+    if language_format == "english_name":
+        if canonical is None:
+            return raw
+        _, english_name = canonical
+        return english_name
+
+    if canonical is not None:
+        display_code, _ = canonical
+        return display_code
+
+    return raw
 
 
 def expand_template(
@@ -60,16 +67,17 @@ def expand_template(
     *,
     source_language: str,
     target_language: str,
+    language_format: str,
     input_text: str = "",
 ) -> str:
     """Mustache 風プレースホルダーを値で置換する."""
     result = template.replace(
         "{{source_language}}",
-        normalize_language_for_prompt(source_language),
+        format_language_for_prompt(source_language, language_format),
     )
     result = result.replace(
         "{{target_language}}",
-        normalize_language_for_prompt(target_language),
+        format_language_for_prompt(target_language, language_format),
     )
     result = result.replace("{{input_text}}", input_text)
     return result
@@ -143,17 +151,20 @@ def call_translation_api(
             DEFAULT_ANNOTATION_SYSTEM_PROMPT,
             source_language=source_lang,
             target_language=target_lang,
+            language_format=config.prompt_language_format,
         )
     else:
         system_content = expand_template(
             config.system_prompt,
             source_language=source_lang,
             target_language=target_lang,
+            language_format=config.prompt_language_format,
         )
     user_content = expand_template(
         config.user_message_template,
         source_language=source_lang,
         target_language=target_lang,
+        language_format=config.prompt_language_format,
         input_text=source_text,
     )
 

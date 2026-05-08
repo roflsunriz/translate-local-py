@@ -39,7 +39,6 @@ from src.config import (
     PROVIDER_LABELS,
 )
 
-
 class SettingsDialog(QDialog):
     def __init__(self, config: AppConfig, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -244,6 +243,15 @@ class SettingsDialog(QDialog):
         placeholder_label.setWordWrap(True)
         layout.addWidget(placeholder_label)
 
+        format_row = QHBoxLayout()
+        format_row.addWidget(QLabel("言語表記:"))
+        self._prompt_language_format_combo = QComboBox()
+        self._prompt_language_format_combo.addItem("言語コード", "code")
+        self._prompt_language_format_combo.addItem("英語名", "english_name")
+        format_row.addWidget(self._prompt_language_format_combo)
+        format_row.addStretch(1)
+        layout.addLayout(format_row)
+
         layout.addWidget(QLabel("システムプロンプト:"))
         self._system_prompt_edit = QPlainTextEdit()
         self._system_prompt_edit.setMinimumHeight(100)
@@ -322,6 +330,11 @@ class SettingsDialog(QDialog):
         self._timeout_spin.setValue(self._config.timeout)
         opacity_pct = max(20, min(100, int(self._config.opacity * 100)))
         self._opacity_slider.setValue(opacity_pct)
+        self._set_combo_value_or_default(
+            self._prompt_language_format_combo,
+            self._config.prompt_language_format,
+            "code",
+        )
         self._system_prompt_edit.setPlainText(self._config.system_prompt)
         self._user_msg_edit.setPlainText(self._config.user_message_template)
         self._annotation_check.setChecked(self._config.enable_annotations)
@@ -344,6 +357,7 @@ class SettingsDialog(QDialog):
             max_tokens=self._max_tokens_spin.value(),
             timeout=self._timeout_spin.value(),
             opacity=self._opacity_slider.value() / 100.0,
+            prompt_language_format=self._prompt_language_format_combo.currentData() or "code",
             system_prompt=self._system_prompt_edit.toPlainText(),
             user_message_template=self._user_msg_edit.toPlainText(),
             enable_annotations=self._annotation_check.isChecked(),

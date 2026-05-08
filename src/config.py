@@ -159,6 +159,7 @@ class AppConfig:
     timeout: int = 60
     source_lang: str = "ja"
     target_lang: str = "en"
+    prompt_language_format: str = "code"
     system_prompt: str = field(default_factory=lambda: DEFAULT_SYSTEM_PROMPT)
     user_message_template: str = field(
         default_factory=lambda: DEFAULT_USER_MESSAGE_TEMPLATE,
