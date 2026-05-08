@@ -20,6 +20,41 @@ from src.config import (
 logger = logging.getLogger(__name__)
 
 
+_LANGUAGE_ALIAS_MAP: dict[str, tuple[str, str]] = {
+    "en": ("en", "English"),
+    "es": ("es", "Spanish"),
+    "fr": ("fr", "French"),
+    "de": ("de", "German"),
+    "ja": ("ja", "Japanese"),
+    "ko": ("ko", "Korean"),
+    "pt": ("pt", "Portuguese"),
+    "ru": ("ru", "Russian"),
+    "zh": ("zh", "Chinese (Simplified)"),
+    "zh-cn": ("zh-CN", "Chinese (Simplified)"),
+    "zh-sg": ("zh-SG", "Chinese (Simplified)"),
+    "zh-tw": ("zh-TW", "Chinese (Traditional)"),
+    "zh-hk": ("zh-HK", "Chinese (Traditional)"),
+    "zh-mo": ("zh-MO", "Chinese (Traditional)"),
+    "zh-hans": ("zh-Hans", "Chinese (Simplified)"),
+    "zh-hant": ("zh-Hant", "Chinese (Traditional)"),
+}
+
+
+def normalize_language_for_prompt(code: str) -> str:
+    """言語コードを `code (English name)` 形式へ正規化する."""
+    raw = code.strip()
+    if not raw:
+        return ""
+
+    normalized_code = raw.lower()
+    canonical = _LANGUAGE_ALIAS_MAP.get(normalized_code)
+    if canonical is None:
+        return raw
+
+    display_code, english_name = canonical
+    return f"{display_code} ({english_name})"
+
+
 def expand_template(
     template: str,
     *,
@@ -28,8 +63,14 @@ def expand_template(
     input_text: str = "",
 ) -> str:
     """Mustache 風プレースホルダーを値で置換する."""
-    result = template.replace("{{source_language}}", source_language)
-    result = result.replace("{{target_language}}", target_language)
+    result = template.replace(
+        "{{source_language}}",
+        normalize_language_for_prompt(source_language),
+    )
+    result = result.replace(
+        "{{target_language}}",
+        normalize_language_for_prompt(target_language),
+    )
     result = result.replace("{{input_text}}", input_text)
     return result
 
