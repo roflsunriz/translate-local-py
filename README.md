@@ -1,3 +1,5 @@
+![main](./gallery/main.png)
+
 # translate-local-py
 
 複数の翻訳バックエンドを切り替えて文章を翻訳するデスクトップアプリです。
