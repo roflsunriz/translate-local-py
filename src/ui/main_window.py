@@ -46,7 +46,7 @@ class MainWindow(QMainWindow):
         self._init_ui()
         self._connect_signals()
         self._apply_config()
-        self.resize(800, 600)
+        self.resize(540, 400)
 
     # ------------------------------------------------------------------
     # UI 構築
@@ -92,10 +92,12 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
-        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setContentsMargins(6, 3, 6, 3)
+        layout.setSpacing(6)
 
         # 言語選択バー
         lang_bar = QHBoxLayout()
+        lang_bar.setSpacing(4)
 
         self._source_combo = self._make_lang_combo()
         self._swap_btn = QPushButton(_icon("swap.svg"), "")
@@ -110,6 +112,7 @@ class MainWindow(QMainWindow):
 
         # ボタンバー
         btn_bar = QHBoxLayout()
+        btn_bar.setSpacing(6)
 
         self._translate_btn = QPushButton(_icon("translate.svg"), "翻訳 (Ctrl+Enter)")
         self._translate_btn.setDefault(True)
@@ -189,9 +192,10 @@ class MainWindow(QMainWindow):
 
     def _build_annotation_panel(self) -> QWidget:
         panel = QWidget()
-        panel.setMinimumWidth(180)
+        panel.setMinimumWidth(140)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setContentsMargins(3, 3, 3, 3)
+        layout.setSpacing(4)
 
         header = QLabel("解説")
         header.setStyleSheet("font-weight: bold; font-size: 13px;")
@@ -381,7 +385,7 @@ class MainWindow(QMainWindow):
             if isinstance(parent, QSplitter):
                 sizes = parent.sizes()
                 if sizes[2] == 0:
-                    w = max(100, parent.width() // 6)
+                    w = max(90, parent.width() // 8)
                     parent.setSizes([sizes[0] - w // 2, sizes[1] - w // 2, w])
 
     def _update_annotation_list(self, annotations: list) -> None:
