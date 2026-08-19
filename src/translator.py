@@ -16,6 +16,7 @@ from src.config import (
     ApiProvider,
     AppConfig,
 )
+from src.model_catalog import resolve_provider_model
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +171,13 @@ def call_translation_api(
 
     endpoint, model, api_key = _resolve_api_settings(config)
     _validate_api_settings(config, endpoint, model, api_key)
+    if config.provider in {ApiProvider.CEREBRAS, ApiProvider.SAKURA}:
+        model = resolve_provider_model(
+            config.provider,
+            api_key,
+            model,
+            config.timeout,
+        )
 
     payload: dict[str, Any] = {
         "messages": [

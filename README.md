@@ -8,6 +8,7 @@
 
 - `ローカル` `Google翻訳` `OpenRouter` `Cerebras` `Sakura` `自由入力` を切り替え可能
 - OpenRouter / Cerebras / Sakura / 自由入力の API キーとモデル設定を個別保存
+- Cerebras / Sakura は認証付き `GET /v1/models` から利用可能なチャットモデルを自動取得し、提供終了した保存モデルを安全に切り替え
 - 言語コードを直接入力できるコンボボックス
 - システムプロンプトとユーザーメッセージテンプレートを設定画面から編集可能
 - 最前面表示、透明度調整、コピー、クリアに対応
@@ -40,6 +41,8 @@ python main.py
 - 通常実行時はリポジトリ直下に保存
 - PyInstaller で配布した実行ファイルでは、実行ファイルと同じフォルダに保存
 
+Cerebras / Sakura のモデル欄を空欄にすると自動選択になります。モデル名を保存済みでも、一覧から消えた場合は音声・埋め込みモデルを除いた有効なチャットモデルへ自動的に切り替えます。一覧取得が一時的に失敗した場合は保存済みモデルを使い、保存済みモデルもない場合はAPIキーと接続を確認できるエラーを表示します。
+
 ## ビルド
 
 PyInstaller の単体実行ファイルを作る場合は以下を使います。
@@ -52,7 +55,7 @@ pyinstaller --noconfirm --clean --windowed --name translate-local-py --icon reso
 
 GitHub Actions で以下を実行します。
 
-- CI: Python 3.12 / 3.13 の matrix でインポートとコンパイルを確認
+- CI: Python 3.12 / 3.13 の matrix でインポート、コンパイル、モデル選択テストを確認
 - Release: `v*` タグの push で PyInstaller ビルドを実行し、成果物を GitHub Release に添付
 
 ## ライセンス

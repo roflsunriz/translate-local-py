@@ -58,26 +58,10 @@ PROVIDER_ORDER: list[ApiProvider] = [
     ApiProvider.CUSTOM,
 ]
 
-CEREBRAS_MODELS: list[str] = [
-    "gpt-oss-120b",
-    "zai-glm-4.7",
-]
-
 DEPRECATED_CEREBRAS_MODELS: set[str] = {
     "llama3.1-8b",
     "qwen-3-235b-a22b-instruct-2507",
 }
-
-SAKURA_MODELS: list[str] = [
-    "Qwen3-Coder-30B-A3B-Instruct",
-    "Qwen3-Coder-480B-A35B-Instruct-FP8",
-    "gpt-oss-120b",
-    "llm-jp-3.1-8x13b-instruct4",
-    "preview/Phi-4-mini-instruct-cpu",
-    "preview/Phi-4-multimodal-instruct",
-    "preview/Qwen3-0.6B-cpu",
-    "preview/Qwen3-VL-30B-A3B-Instruct",
-]
 
 DEFAULT_SYSTEM_PROMPT = (
     "あなたはプロフェッショナルの高度な翻訳エンジンである。"
@@ -148,9 +132,9 @@ class AppConfig:
     openrouter_api_key: str = ""
     openrouter_model: str = ""
     cerebras_api_key: str = ""
-    cerebras_model: str = CEREBRAS_MODELS[0]
+    cerebras_model: str = ""
     sakura_api_key: str = ""
-    sakura_model: str = SAKURA_MODELS[0]
+    sakura_model: str = ""
     custom_api_url: str = ""
     custom_api_key: str = ""
     custom_model: str = ""
@@ -228,6 +212,6 @@ class AppConfig:
 
         cerebras_model = migrated.get("cerebras_model")
         if cerebras_model in DEPRECATED_CEREBRAS_MODELS:
-            migrated["cerebras_model"] = CEREBRAS_MODELS[0]
+            migrated["cerebras_model"] = ""
 
         return migrated

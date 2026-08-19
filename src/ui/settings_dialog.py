@@ -29,9 +29,7 @@ from PyQt6.QtWidgets import (
 )
 
 from src.config import (
-    CEREBRAS_MODELS,
     PROVIDER_ORDER,
-    SAKURA_MODELS,
     ApiProvider,
     AppConfig,
     DEFAULT_SYSTEM_PROMPT,
@@ -189,8 +187,8 @@ class SettingsDialog(QDialog):
         form.addRow("API キー:", self._cerebras_api_key_edit)
 
         self._cerebras_model_combo = QComboBox()
-        for model in CEREBRAS_MODELS:
-            self._cerebras_model_combo.addItem(model)
+        self._cerebras_model_combo.setEditable(True)
+        self._cerebras_model_combo.setPlaceholderText("空欄なら利用可能モデルを自動取得")
         form.addRow("モデル:", self._cerebras_model_combo)
         return page
 
@@ -207,8 +205,8 @@ class SettingsDialog(QDialog):
         form.addRow("API キー:", self._sakura_api_key_edit)
 
         self._sakura_model_combo = QComboBox()
-        for model in SAKURA_MODELS:
-            self._sakura_model_combo.addItem(model)
+        self._sakura_model_combo.setEditable(True)
+        self._sakura_model_combo.setPlaceholderText("空欄なら利用可能モデルを自動取得")
         form.addRow("モデル:", self._sakura_model_combo)
         return page
 
@@ -286,6 +284,9 @@ class SettingsDialog(QDialog):
 
     @staticmethod
     def _set_combo_value(combo: QComboBox, value: str) -> None:
+        if not value:
+            combo.setEditText("")
+            return
         index = combo.findText(value)
         if index >= 0:
             combo.setCurrentIndex(index)
@@ -314,11 +315,7 @@ class SettingsDialog(QDialog):
         self._openrouter_api_key_edit.setText(self._config.openrouter_api_key)
         self._openrouter_model_edit.setText(self._config.openrouter_model)
         self._cerebras_api_key_edit.setText(self._config.cerebras_api_key)
-        self._set_combo_value_or_default(
-            self._cerebras_model_combo,
-            self._config.cerebras_model,
-            CEREBRAS_MODELS[0],
-        )
+        self._set_combo_value(self._cerebras_model_combo, self._config.cerebras_model)
         self._sakura_api_key_edit.setText(self._config.sakura_api_key)
         self._set_combo_value(self._sakura_model_combo, self._config.sakura_model)
         self._custom_api_url_edit.setText(self._config.custom_api_url)
