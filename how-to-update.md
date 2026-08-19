@@ -18,3 +18,15 @@ CerebrasとSakuraのモデル更新では、認証付き `GET /v1/models` の `d
 ## ロールバック
 
 更新前のGitコミットへ戻し、依存関係を再インストールします。設定ファイルは保持されるため、旧版でモデル名が無効になった場合は設定画面で利用可能なモデル名を手動指定します。
+
+## リリース
+
+mainのテスト、依存関係監査、Windows onefileビルドが成功し、作業ツリーがクリーンであることを確認してから、次のパッチバージョンのタグを作成してpushします。
+
+```powershell
+git push origin main
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+タグpushでReleaseワークフローが `dist/translate-local-py.exe` を生成し、同名のGitHub Releaseへ添付します。ワークフロー完了後にReleaseが公開済みで、exeが1件添付され、タグとmainの対象コミットが一致することを確認します。公開済みタグを付け替えず、修正が必要な場合は新しいパッチバージョンで再リリースします。
