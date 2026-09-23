@@ -13,6 +13,8 @@
 ### Changed
 
 - 依存更新を安全に省力化するため、Dependabot の patch／minor PR を既存 CI の全チェック成功後に自動取り込みし、失敗ジョブを一度再実行する設定を追加した。
+- GitHub Actionsの保守性を保つため、actions/checkoutをv4からv7へ、actions/setup-pythonをv5からv7へ、softprops/action-gh-releaseをv2からv3へ更新した。
+- セキュリティ修正と互換性維持のため、requestsの下限を2.31から2.34.2へ、PyQt6の下限を6.6から6.11.0へ引き上げた。
 
 ## [1.0.7] - 2026-08-19
 
