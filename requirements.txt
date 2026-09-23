@@ -1,2 +1,2 @@
-requests>=2.31,<3
+requests>=2.34.2,<3
 PyQt6>=6.6,<7
