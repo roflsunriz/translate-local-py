@@ -45,11 +45,27 @@ Cerebras / Sakura のモデル欄を空欄にすると自動選択になりま�
 
 一覧取得が一時的に失敗した場合は保存済みモデルを使います。保存済みモデルもない場合は、APIキーと接続の確認を促すエラーを表示します。
 
+## ビルド
+
+PyInstaller の単体実行ファイルを作る場合は以下を使います。
+
+```powershell
+pyinstaller --noconfirm --clean --windowed --name translate-local-py --icon resources/icon.ico --add-data "resources;resources" main.py
+```
+
+## CI / CD
+
+GitHub Actions で以下を実行します。
+
+- CI: Python 3.12 / 3.13 の matrix でインポート、コンパイル、モデル選択テストを確認
+- Release: `v*` タグの push で PyInstaller ビルドを実行し、成果物を GitHub Release に添付
+
 ## ライセンス
 
 MIT
 
+## 依存更新の自動処理
 
-## 開発・運用の知見
+更新PRの取り込みは、必要なCIチェックにすべて成功したものだけを対象に、毎月28日18:00（Asia/Tokyo）の月末処理で行います。
 
-開発環境、内部構成、検証コマンドと運用上の注意は [findings.md](findings.md) を参照してください。更新・復旧の手順と検証記録は、同ファイルから案内しています。
+Dependabot は対象の依存関係を毎月28日00:00（Asia/Tokyo）に確認します。patch／minor 更新は PR のチェック（CI）が成功した後に自動で squash merge されます。CI の失敗ジョブは 1 回だけ再実行します。再失敗した PR は残して手動で修正します。major 更新も互換性を確認し、同じ月末処理で取り込みます。
